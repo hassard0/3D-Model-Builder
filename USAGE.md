@@ -6,7 +6,7 @@ UI walkthrough and the typical workflows.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ AniGen Studio  [model]  [style]  [prompt input]  [Gen] [⚙ ⚙]    │   ← header
+│ 3D Studio  [model]  [style]  [prompt input]  [Gen] [⚙ ⚙]        │   ← header
 ├─────────────────────────────────────────────────────────────────┤
 │ status line / progress                                          │
 ├─────────────────────────────────────────────────────────────────┤

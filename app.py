@@ -1,4 +1,4 @@
-"""Multi-model 3D web studio.
+"""3D Studio — multi-model image/text-to-3D web app.
 
 Pipelines (all hot-loaded at startup, one per GPU):
   cuda:0  AniGen                 — rigged textured GLB      (~8 GB)
@@ -11,7 +11,7 @@ truncates at 60 chars and hardcodes a Chinese style suffix) and call the
 underlying diffusers PAG pipeline directly with our English pose-focused
 prompt + negative at guidance 7.5 / pag 2.0 / 35 steps.
 
-Port 9000, bound to 0.0.0.0 for tailnet/LAN access.
+Port 9000, bound to 0.0.0.0 for LAN access.
 """
 import asyncio
 import gc
@@ -82,7 +82,7 @@ HUNYUANDIT_MODEL = "Tencent-Hunyuan/HunyuanDiT-v1.1-Diffusers"
 HUNYUANDIT_CONTROLNET_POSE = "Tencent-Hunyuan/HunyuanDiT-v1.1-ControlNet-Diffusers-Pose"
 POSES_DIR = Path(__file__).resolve().parent / "static" / "poses"
 
-app = FastAPI(title="AniGen Web")
+app = FastAPI(title="3D Studio")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.mount("/results", StaticFiles(directory=RESULTS_DIR), name="results")
 

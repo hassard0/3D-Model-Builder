@@ -8,7 +8,7 @@ time. This avoids OOM from concurrent runs and removes the need for a queue
 manager — the lock IS the queue.
 
 ```
-┌──────────────── FastAPI process (vulcan:9000) ────────────────┐
+┌──────────────── FastAPI process (host:9000) ──────────────────┐
 │                                                               │
 │   ┌──────────────┐   ┌────────────┐   ┌──────────────────┐    │
 │   │ HTTP routes  │──►│ jobs[]     │   │ gen_lock         │    │
