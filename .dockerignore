@@ -1,0 +1,23 @@
+.git
+.github
+__pycache__
+*.pyc
+*.pyo
+*.swp
+
+# These get cloned/created at runtime in the /data volume:
+results/
+static/poses/
+
+# Local debugging junk:
+dbg_*.png
+last_input.png
+rmbg_test.png
+*.glb
+
+.venv/
+venv/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

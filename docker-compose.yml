@@ -1,0 +1,49 @@
+# docker compose up           # build the image and run
+# docker compose up -d        # detached
+# docker compose logs -f      # follow logs
+# docker compose down         # stop
+#
+# First boot installs AniGen + Hunyuan3D into the `data` volume and downloads
+# ~75 GB of HF weights. Set SKIP_WEIGHTS=1 in the env to skip prefetch and
+# pull weights lazily on first generation.
+#
+# Requires the NVIDIA Container Toolkit on the host:
+# https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
+
+services:
+  studio:
+    build: .
+    image: ghcr.io/hassard0/3d-model-builder:latest
+    container_name: 3d-studio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    volumes:
+      - studio-data:/data
+    environment:
+      # Comment out to skip weight prefetch on first boot:
+      # SKIP_WEIGHTS: "1"
+      HF_HUB_ENABLE_HF_TRANSFER: "1"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    # If your `docker compose` is older and doesn't honor the spec above:
+    # runtime: nvidia
+    # environment:
+    #   NVIDIA_VISIBLE_DEVICES: all
+    #   NVIDIA_DRIVER_CAPABILITIES: compute,utility
+
+volumes:
+  studio-data:
+    # AniGen + Hunyuan3D + HF cache. ~75 GB after first boot. Persists
+    # across container rebuilds. Bind-mount a host path here if you'd
+    # rather control where it lives:
+    #   driver: local
+    #   driver_opts:
+    #     type: none
+    #     device: /var/lib/3d-studio
+    #     o: bind

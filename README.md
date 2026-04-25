@@ -91,19 +91,37 @@ distinct devices to keep models hot.
 
 ## Quick start
 
+### Option A: Docker (recommended)
+
+Requires [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+on the host.
+
 ```bash
 git clone https://github.com/hassard0/3D-Model-Builder.git
 cd 3D-Model-Builder
-./setup.sh             # one-command install (~30 min, including ~75 GB weight prefetch)
+docker compose up
+```
+
+First boot clones AniGen + Hunyuan3D-2 into a persistent volume and
+downloads ~75 GB of weights (slow). Subsequent boots take seconds. The
+prebuilt image is also published to `ghcr.io/hassard0/3d-model-builder:latest`
+on every push to `main`.
+
+### Option B: bare-metal install
+
+```bash
+git clone https://github.com/hassard0/3D-Model-Builder.git
+cd 3D-Model-Builder
+./setup.sh             # one-command install (~30 min including weight prefetch)
 python preflight.py    # verify the env
 python app.py          # bind 0.0.0.0:9000
 ```
 
-Then open `http://localhost:9000` in a browser. See [DEPLOY.md](DEPLOY.md)
-for what `setup.sh` does step-by-step, or to install components separately.
+`setup.sh` is idempotent — re-run it after any partial failure. See
+[DEPLOY.md](DEPLOY.md) for a step-by-step breakdown if you need to install
+components separately or are debugging an environment issue.
 
-If `setup.sh` fails partway, re-run it — every step is idempotent and
-checks for prior completion before doing work.
+Then open `http://localhost:9000` in a browser.
 
 ## License
 
