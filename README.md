@@ -1,98 +1,122 @@
 # 3D Model Builder
 
-Web studio that turns a text prompt or a reference image into a textured (and
-optionally rigged) 3D mesh, served from a single FastAPI process with all
-models hot-loaded across multiple GPUs.
-
-**Pipeline at a glance**
+A self-hosted web studio for generating 3D characters and objects from text
+prompts or reference images. Six ML models are hot-loaded across four GPUs,
+orchestrated by a single FastAPI process, and rendered in a three.js viewer
+with procedural animations and an interactive bone-drag rig editor.
 
 ```
-text prompt ──► HunyuanDiT (+ControlNet-Pose) ──► 2D image ─┐
-                                                            ├──► AniGen          ──► rigged GLB
-uploaded image ─────────────────────────────────────────────┤
-                                                            ├──► Hunyuan3D-2     ──► textured static GLB
-multi-view inputs ─► (Zero123++ fills missing) ─────────────┘    Hunyuan3D-2mv   ──► textured static GLB (multi-view shape)
+┌─────────────────────────────┐    ┌─────────────────────────────┐
+│  Text prompt                │───►│  HunyuanDiT  +  ControlNet  │
+│  + style preset             │    │  Pose (optional T-pose)     │
+│  + optional pose pick       │    │           cuda:1            │
+└─────────────────────────────┘    └────────────┬────────────────┘
+                                                ▼
+   ┌──────────────┐         ┌────────────────────────────────────┐
+   │ Upload image │────────►│        2D conditioning image       │
+   └──────────────┘         └────────────┬───────────────────────┘
+                                         ▼
+                          (RMBG-1.4 background removal — cuda:2)
+                                         ▼
+            ┌────────────────────────────┴──────────────────────────────┐
+            ▼                            ▼                              ▼
+   ┌──────────────────┐      ┌────────────────────┐      ┌──────────────────────────┐
+   │ AniGen (cuda:0)  │      │ Hunyuan3D-2        │      │ Hunyuan3D-2mv (cuda:2)   │
+   │ image → rigged   │      │ shape (cuda:2)     │      │ multi-view → mesh        │
+   │ textured GLB     │      │ paint (cuda:3)     │      │ Zero123++ (cuda:3) fills │
+   └──────────────────┘      └────────────────────┘      │ missing views            │
+                                                          └──────────────────────────┘
+                                         ▼
+                    ┌─────────────────────────────────────────────┐
+                    │ three.js viewer with procedural animations, │
+                    │ lighting/camera presets, classification     │
+                    │ overlay, and interactive bone editor        │
+                    └─────────────────────────────────────────────┘
 ```
 
-A three.js viewer renders the result with orbit controls, lighting presets,
-camera presets, procedural animations, a skeleton classification overlay,
-and an interactive bone-drag editor.
+## Documentation
 
-## Models
-
-| Stage              | Model                                                | GPU     | Approx VRAM |
-| ------------------ | ---------------------------------------------------- | ------- | ----------- |
-| Text → image       | `Tencent-Hunyuan/HunyuanDiT-v1.1-Diffusers` + `…ControlNet-Diffusers-Pose` | cuda:1  | 9.5 GB      |
-| Background removal | `briaai/RMBG-1.4`                                    | cuda:2  | 0.2 GB      |
-| Image → rigged 3D  | `VAST-AI/AniGen` (ss_flow_duet + slat_flow_auto, EMA)| cuda:0  | 8 GB        |
-| Image → static 3D  | `tencent/Hunyuan3D-2` (shape + paint)                | cuda:2/3| 12 GB       |
-| Multi-view → 3D    | `tencent/Hunyuan3D-2mv`                              | cuda:2  | 5.5 GB      |
-| Novel-view synth   | `sudo-ai/zero123plus-v1.2`                           | cuda:3  | 5 GB        |
-
-Tested on 4× NVIDIA Tesla V100-SXM2 16 GB (Volta, SM 7.0). Volta-specific
-quirks (no bf16, no flash-attn-2, prebuilt CUDA wheels often Ampere-only) are
-documented in `DEPLOY.md`.
+* **[ARCHITECTURE.md](ARCHITECTURE.md)** — pipeline diagrams, GPU placement, model details
+* **[USAGE.md](USAGE.md)** — common workflows and UI walkthrough
+* **[API.md](API.md)** — REST endpoint reference
+* **[SETTINGS.md](SETTINGS.md)** — every tunable knob in the gear modal
+* **[DEPLOY.md](DEPLOY.md)** — install on a fresh server (V100-tested)
+* **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** — every failure mode I've hit and the fix
 
 ## Features
 
-* **Text or image input.** Type a prompt, drop an image, or fill multi-view
-  slots — the server picks the right path.
-* **Pose ControlNet.** 15 pre-rendered OpenPose skeletons (T-pose, A-pose,
-  walking, etc.) you can pick from to force the generated 2D image into a
-  specific pose. Critical for getting AniGen rigs right.
-* **Zero123++ novel-view synthesis** for Hunyuan3D-2mv when you only have a
-  front view — generates back/left/right.
-* **Live 3D viewer** with orbit controls, animation playback, lighting
-  presets (studio / neutral / sunset / neon / night) plus per-light sliders,
-  camera presets (front / 3-4 / side / back / top), skeleton + classification
-  overlays, wireframe, grid, auto-rotate.
-* **Procedural animations** built from skeleton topology: idle sway, breathe,
-  spin, walk, run, wave, sit, crouch, jump, wiggle, dance.
-* **Bone editor.** Click a colored sphere in the classification overlay,
-  drag the gizmo to reposition that bone (mesh deforms via skinning), press
-  R to switch to rotate mode, Esc to deselect. Download the edited GLB.
-* **Cancel** an in-flight job at the next stage boundary; up to ~60 s saved
-  on Hunyuan3D-2 paint.
-* **Settings modal** with per-model parameters persisted to localStorage:
-  guidance/PAG/steps for T2I, CFG/joint density/skin smoothing for AniGen,
-  texture toggle and polygon cap for Hunyuan3D-2.
-* **Job history** under `results/web/<job_id>/`.
+### Inputs
+* **Text → image → 3D** with HunyuanDiT v1.1 (full, undistilled, bilingual CLIP+mT5)
+* **Image upload → 3D** to skip the T2I step
+* **Multi-view → 3D** with up to 4 hand-uploaded views (front/back/left/right)
+* **Auto-fill missing views** via Zero123++ novel-view synthesis when only the front is provided
+* **Pose ControlNet** with 15 pre-rendered OpenPose skeletons (T-pose, A-pose, idle, walking, running, sitting, crouching, wave, jump, power, victory, fighting, kneeling, ballet, dab) for forcing pose structure during T2I
+* **Style presets**: Character (rigged-friendly), Creature, Object, Stylized, Realistic — each with style-specific positive suffixes and negative prompts
 
-## Repo layout
+### 3D backends
+* **AniGen** — `VAST-AI/AniGen`. Image-to-rigged-3D producing a textured GLB with skeleton, joints, and skinning weights. Uses EMA weights for higher quality.
+* **Hunyuan3D-2** — `tencent/Hunyuan3D-2`. Image-to-textured static mesh. ~1 M raw triangles, decimated client-side cap (default 120k).
+* **Hunyuan3D-2mv** — `tencent/Hunyuan3D-2mv`. Multi-view textured mesh; better geometry from 2-4 views.
 
-```
-app.py              FastAPI server + pipeline wiring + monkey-patches
-prompt_harness.py   Style presets and prompt enrichment
-pose_gallery.py     Generates 15 OpenPose skeleton images at 1024×1024
-static/
-  index.html        Main UI
-  viewer.js         three.js viewer, animations, rig editor
-  poses/            (generated) pose skeleton PNGs
-DEPLOY.md           Server install instructions (V100-specific)
-```
+### Viewer
+* **Procedural animations** generated from skeleton topology: idle sway, breathe, spin, walk, run, wave, sit, crouch, jump, wiggle, dance. The classifier identifies legs/arms/spine geometrically; rotation axes are derived per-bone (perpendicular to bone-direction × world-up).
+* **Lighting controls** with 5 environment presets (studio / neutral / sunset / neon / night), per-light intensity sliders (ambient, key, fill, rim), exposure slider, background color picker.
+* **Camera presets** — Front, 3/4, Side, Back, Top, Fit
+* **Display toggles** — skeleton, classification overlay (color-coded R=legs G=spine B=arms Y=other), wireframe, grid, auto-rotate
+* **Interactive bone-drag rig editor**: click any classification sphere to attach a translate/rotate gizmo to that bone. Drag to reposition; mesh deforms live via skinning. **R** = rotate mode, **T** = translate mode, **Esc** = deselect. Save the corrected rig as a new GLB.
+* **Job cancellation** at stage boundaries (saves up to ~60 s on a Hunyuan3D-2 paint job)
+* **Settings persisted** to `localStorage` per browser
+
+### Server
+* Single FastAPI process, all six models hot-loaded at startup (~2 minute cold boot)
+* Job locking — one generation at a time across all models (avoids GPU thrash)
+* Per-stage status tracking (`queued` → `image` → `views` → `mesh` → `done` / `error` / `cancelled`)
+* Result files persist on disk under `results/web/<job_id>/`
+
+## Hardware
+
+Tested on Ubuntu 24.04 with **4× NVIDIA Tesla V100-SXM2 16 GB** (Volta, SM 7.0,
+no native bf16, no flash-attn-2 support). VRAM at steady state:
+
+| GPU    | Models                                                | Used   | Free  |
+| ------ | ----------------------------------------------------- | ------ | ----- |
+| cuda:0 | AniGen                                                | 8.2 GB | 8 GB  |
+| cuda:1 | HunyuanDiT + ControlNet-Pose (single fused pipeline)  | 9.5 GB | 7 GB  |
+| cuda:2 | Hunyuan3D-2 shape + Hunyuan3D-2mv + RMBG-1.4         | 10.5 GB | 5 GB |
+| cuda:3 | Hunyuan3D-2 paint + Zero123++                         | 11.0 GB | 5 GB |
+
+Should also run on Ampere or newer with simpler dependency pins (no need for
+Volta-specific rebuilds). Single-GPU is *not* supported — the design relies on
+distinct devices to keep models hot.
 
 ## Quick start
 
-This stack is tuned for a 4× V100 server. Single-GPU isn't supported — it
-relies on having distinct devices for AniGen, HunyuanDiT, Hy3D shape, Hy3D
-paint. See `DEPLOY.md` for the full install walkthrough.
+See [DEPLOY.md](DEPLOY.md) for the full install. After install:
 
 ```bash
-# 1. Generate the pose gallery (one-off; pose PNGs aren't checked in)
-python pose_gallery.py static/poses
-
-# 2. Run the server
-python app.py
-# binds 0.0.0.0:9000
+cd /path/to/AniGen/server
+python pose_gallery.py static/poses    # one-off, ~3 seconds
+python app.py                           # binds 0.0.0.0:9000
 ```
 
-Open `http://localhost:9000` (or your tailnet IP). Type a prompt or upload an
-image, pick a model, hit Generate.
+Open `http://localhost:9000` in a browser.
 
-## License notes
+## License
 
-* AniGen, HunyuanDiT, Hunyuan3D-2 — Tencent / VAST-AI non-commercial licenses.
-  Use accordingly.
-* Zero123++ — Apache 2.0.
-* RMBG-1.4 — Bria AI Community License (non-commercial).
-* This repo's own code: MIT.
+* This repo's orchestration code: [MIT](LICENSE)
+* AniGen, HunyuanDiT, Hunyuan3D-2, Hunyuan3D-2mv: Tencent / VAST-AI
+  non-commercial licenses — abide by their terms
+* Zero123++: Apache 2.0
+* RMBG-1.4: BRIA AI Community License (non-commercial)
+
+This is a research / personal-use stack. Verify the downstream model licenses
+before any commercial deployment.
+
+## Acknowledgements
+
+Built on top of the open releases from
+[VAST-AI-Research/AniGen](https://github.com/VAST-AI-Research/AniGen),
+[Tencent-Hunyuan/Hunyuan3D-2](https://github.com/Tencent-Hunyuan/Hunyuan3D-2),
+[Tencent-Hunyuan/HunyuanDiT](https://github.com/Tencent-Hunyuan/HunyuanDiT),
+[SUDO-AI-3D/zero123plus](https://github.com/SUDO-AI-3D/zero123plus), and
+[BRIA AI's RMBG](https://huggingface.co/briaai/RMBG-1.4).
