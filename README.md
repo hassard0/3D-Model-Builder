@@ -91,15 +91,19 @@ distinct devices to keep models hot.
 
 ## Quick start
 
-See [DEPLOY.md](DEPLOY.md) for the full install. After install:
-
 ```bash
-cd /path/to/AniGen/server
-python pose_gallery.py static/poses    # one-off, ~3 seconds
-python app.py                           # binds 0.0.0.0:9000
+git clone https://github.com/hassard0/3D-Model-Builder.git
+cd 3D-Model-Builder
+./setup.sh             # one-command install (~30 min, including ~75 GB weight prefetch)
+python preflight.py    # verify the env
+python app.py          # bind 0.0.0.0:9000
 ```
 
-Open `http://localhost:9000` in a browser.
+Then open `http://localhost:9000` in a browser. See [DEPLOY.md](DEPLOY.md)
+for what `setup.sh` does step-by-step, or to install components separately.
+
+If `setup.sh` fails partway, re-run it — every step is idempotent and
+checks for prior completion before doing work.
 
 ## License
 

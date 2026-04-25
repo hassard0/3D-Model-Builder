@@ -1,7 +1,15 @@
 # Deploying 3D Model Builder
 
+> **Quickest path: run `./setup.sh` from the repo root.** It performs every
+> step below automatically, detects your GPU's compute capability, and is
+> idempotent. The instructions below are the manual breakdown for when you
+> need to debug a step or install components separately.
+
 Tested target: **Ubuntu 24.04, 4× V100-SXM2 16 GB (Volta, SM 7.0), CUDA 12.x**.
-Other configurations should work but expect to revisit version pins.
+Other configurations should work but expect to revisit version pins. The
+setup script auto-detects the GPU's compute capability and rebuilds CUDA
+extensions accordingly, so it should work on Ampere / Ada / Hopper without
+manual changes.
 
 ## 1. Conda env
 

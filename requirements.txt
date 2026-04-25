@@ -1,0 +1,37 @@
+# Server-side Python dependencies for 3D Model Builder.
+#
+# Note: torch / xformers / pytorch3d / nvdiffrast / spconv come from AniGen's
+# `setup.sh --basic --xformers`. This file covers everything beyond that.
+#
+# Versions are pinned to a known-good combination. Bumping any one of these
+# may require simultaneously bumping others (see TROUBLESHOOTING.md for the
+# typical conflict patterns).
+
+# Server runtime
+fastapi==0.112.2
+uvicorn[standard]>=0.30,<0.34
+python-multipart>=0.0.9
+pydantic==2.10.6
+
+# T2I + 3D pipelines
+diffusers==0.37.1
+transformers==5.5.4
+accelerate>=1.0,<2.0
+huggingface_hub<2.0
+safetensors>=0.4
+
+# Tokenizer support — both required, in this order:
+# - sentencepiece for HunyuanDiT's mT5 tokenizer_2
+# - tiktoken for transformers 5.5 internal converter paths
+sentencepiece>=0.2.0
+tiktoken>=0.9.0
+
+# Mesh / IO utilities
+rtree>=1.4.0  # required by trimesh.proximity (AniGen skin-weight transfer)
+trimesh>=4.0
+pymeshlab>=2025.0  # quadric decimation fallback for Hunyuan3D mesh
+pillow>=10.0
+
+# Background removal
+rembg>=2.0
+onnxruntime>=1.17
