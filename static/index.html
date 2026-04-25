@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AniGen Studio</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #0e0e12; color: #ddd; overflow: hidden; height: 100vh; }
+  #hdr { padding: 10px 18px; background: #17171d; display: flex; gap: 10px; align-items: center; border-bottom: 1px solid #2a2a33; flex-wrap: wrap; }
+  #hdr h1 { margin: 0 10px 0 0; font-size: 14px; font-weight: 600; letter-spacing: 0.5px; color: #8ab4f8; }
+  #prompt { flex: 1; min-width: 280px; padding: 9px 14px; font-size: 14px; background: #23232c; color: #eee; border: 1px solid #353540; border-radius: 6px; outline: none; }
+  #prompt:focus { border-color: #4a90e2; }
+  .ctl { padding: 9px 10px; font-size: 13px; background: #23232c; color: #ddd; border: 1px solid #353540; border-radius: 6px; outline: none; cursor: pointer; }
+  .ctl:focus { border-color: #4a90e2; }
+  #go { padding: 9px 20px; font-size: 14px; background: #4a90e2; color: #fff; border: 0; border-radius: 6px; cursor: pointer; font-weight: 500; }
+  #go:disabled { background: #3a3a44; color: #888; cursor: not-allowed; }
+  #go:hover:not(:disabled) { background: #5aa0f2; }
+  #status { padding: 8px 18px; background: #17171d; font-size: 12px; color: #8a8a99; border-bottom: 1px solid #2a2a33; min-height: 30px; display: flex; align-items: center; gap: 8px; }
+  .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid #444; border-top-color: #4a90e2; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #enriched-row { padding: 6px 18px; background: #13131a; font-size: 11px; color: #888; border-bottom: 1px solid #23232c; font-family: ui-monospace, monospace; overflow-x: auto; white-space: nowrap; }
+  #enriched-row strong { color: #8a8a99; margin-right: 6px; font-weight: 600; letter-spacing: 0.5px; }
+  #main { display: flex; height: calc(100vh - 138px); }
+  #viewer { flex: 1; background: #1a1a21; position: relative; }
+  #viewer canvas { display: block; }
+  #sidebar { width: 290px; padding: 16px; background: #17171d; border-left: 1px solid #2a2a33; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+  #sidebar h3 { margin: 0 0 4px 0; font-size: 11px; font-weight: 600; letter-spacing: 1px; color: #8a8a99; text-transform: uppercase; }
+  #preview-wrap { min-height: 200px; display: flex; align-items: center; justify-content: center; background: #0e0e12; border-radius: 6px; border: 1px dashed #2a2a33; }
+  #preview-wrap.empty::before { content: "2D preview will appear here"; color: #555; font-size: 12px; }
+  #preview { max-width: 100%; border-radius: 6px; display: none; }
+  .btn { padding: 10px 14px; background: #23232c; color: #ddd; border: 1px solid #353540; border-radius: 6px; text-align: center; text-decoration: none; font-size: 13px; display: block; cursor: pointer; }
+  .btn:hover:not(.disabled) { background: #2a2a33; }
+  .btn.disabled { color: #555; pointer-events: none; border-color: #23232c; }
+  .btn.primary { background: #2e5090; border-color: #3a66b0; color: #fff; }
+  .btn.primary:hover:not(.disabled) { background: #3a66b0; }
+  #controls { display: flex; flex-direction: column; gap: 8px; }
+  .toggle { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #aaa; }
+  .toggle input { accent-color: #4a90e2; }
+  #jobinfo { font-size: 11px; color: #666; font-family: ui-monospace, monospace; padding-top: 8px; border-top: 1px solid #23232c; line-height: 1.5; }
+  #jobinfo span.k { color: #8a8a99; display: inline-block; width: 44px; }
+  #anim-select, #model-select, #style-select { padding: 8px; background: #23232c; color: #ddd; border: 1px solid #353540; border-radius: 6px; font-size: 12px; width: 100%; }
+  .badge { display: inline-block; padding: 1px 6px; margin-left: 4px; font-size: 10px; border-radius: 3px; vertical-align: middle; letter-spacing: 0.3px; }
+  .badge.rigged { background: #2e5090; color: #fff; }
+  .badge.textured { background: #5a3a8e; color: #fff; }
+  .badge.static { background: #3a3a44; color: #bbb; }
+  .badge.warn { background: #8a5a2a; color: #fff; }
+  #model-meta { font-size: 11px; color: #888; margin-top: 6px; line-height: 1.5; }
+  .slider-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #aaa; }
+  .slider-row span { min-width: 68px; display: inline-block; }
+  .slider-row input[type="range"] { flex: 1; accent-color: #4a90e2; }
+  .slider-row input[type="color"] { width: 40px; height: 22px; background: transparent; border: 1px solid #353540; border-radius: 4px; padding: 0; cursor: pointer; }
+  #lighting { display: flex; flex-direction: column; gap: 6px; }
+  .cam-btn { padding: 6px 4px; background: #23232c; color: #ddd; border: 1px solid #353540; border-radius: 4px; font-size: 11px; cursor: pointer; }
+  .cam-btn:hover { background: #2a2a33; border-color: #4a90e2; }
+  .cam-btn.active { background: #2e5090; border-color: #4a90e2; color: #fff; }
+  .tab-btn { padding: 8px 14px; background: transparent; color: #888; border: 0; border-bottom: 2px solid transparent; cursor: pointer; font-size: 12px; font-weight: 600; letter-spacing: 0.3px; }
+  .tab-btn:hover { color: #ddd; }
+  .tab-btn.active { color: #8ab4f8; border-bottom-color: #4a90e2; }
+  .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+  .field label { font-size: 12px; color: #aaa; font-weight: 500; }
+  .field label.toggle { flex-direction: row; align-items: center; gap: 8px; }
+  .field label .hint { color: #666; font-weight: 400; font-size: 11px; margin-left: 4px; }
+  .field input[type="number"], .field input[type="text"], .field textarea { background: #0e0e12; color: #eee; border: 1px solid #353540; border-radius: 4px; padding: 7px 10px; font-size: 13px; font-family: inherit; }
+  .field textarea { font-family: ui-monospace, monospace; font-size: 12px; resize: vertical; }
+  .field-row { display: flex; gap: 10px; }
+  .field-row > .field { flex: 1; }
+  .mv-slot { display: flex; flex-direction: column; gap: 3px; }
+  .mv-label { font-size: 11px; color: #aaa; }
+  .mv-drop { aspect-ratio: 1/1; background-size: cover; background-position: center; background-color: #0e0e12; border: 1px dashed #353540; border-radius: 4px; color: #555; font-size: 11px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: border-color 0.2s; }
+  .mv-drop:hover { border-color: #4a90e2; color: #888; }
+  .mv-drop.filled { border-style: solid; border-color: #4a90e2; color: transparent; }
+  .mv-drop.drag { border-color: #4a90e2; background-color: #1a2440; }
+  .pose-tile { aspect-ratio: 1/1; background-color: #0e0e12; background-size: cover; background-position: center; border: 2px solid #2a2a33; border-radius: 4px; cursor: pointer; position: relative; transition: all 0.15s; }
+  .pose-tile:hover { border-color: #4a90e2; transform: scale(1.05); }
+  .pose-tile.selected { border-color: #4a90e2; box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.3); }
+  .pose-tile .label { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.7); color: #eee; font-size: 9px; text-align: center; padding: 2px; border-radius: 0 0 2px 2px; line-height: 1.1; }
+</style>
+</head>
+<body>
+<div id="hdr">
+  <h1>AniGen Studio</h1>
+  <select id="model-select" class="ctl" title="3D model backend" style="width: 240px; flex: 0 0 auto;">
+    <option value="anigen">AniGen — rigged</option>
+    <option value="hunyuan3d">Hunyuan3D-2 — textured (1 image)</option>
+    <option value="hunyuan3dmv">Hunyuan3D-2mv — multi-view</option>
+  </select>
+  <select id="style-select" class="ctl" title="Prompt style preset" style="width: 200px; flex: 0 0 auto;">
+    <option value="character">Character</option>
+    <option value="creature">Creature / animal</option>
+    <option value="object">Object / prop</option>
+    <option value="stylized">Stylized / low-poly</option>
+    <option value="realistic">Realistic / PBR</option>
+  </select>
+  <input id="prompt" placeholder="e.g. a robot dog with antennae, cartoon style (or upload an image →)" />
+  <input id="file-input" type="file" accept="image/*" style="display:none;" />
+  <button id="upload-btn" title="Upload character image instead of generating one" style="padding: 9px 12px; font-size: 16px; background: #23232c; color: #ddd; border: 1px solid #353540; border-radius: 6px; cursor: pointer;">🖼</button>
+  <button id="go">Generate</button>
+  <button id="cancel" style="display:none; padding: 9px 18px; font-size: 14px; background: #c15a5a; color: #fff; border: 0; border-radius: 6px; cursor: pointer; font-weight: 500;">Cancel</button>
+  <button id="settings-btn" title="Settings" style="padding: 9px 12px; font-size: 16px; background: #23232c; color: #ddd; border: 1px solid #353540; border-radius: 6px; cursor: pointer;">⚙</button>
+</div>
+
+<div id="settings-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:1000; align-items:center; justify-content:center;">
+  <div style="background:#17171d; border:1px solid #353540; border-radius:8px; width:540px; max-width:92vw; max-height:88vh; display:flex; flex-direction:column; box-shadow:0 8px 40px rgba(0,0,0,0.6);">
+    <div style="padding:14px 18px; border-bottom:1px solid #2a2a33; display:flex; align-items:center; gap:10px;">
+      <h2 style="margin:0; font-size:16px; color:#8ab4f8; flex:1;">Settings</h2>
+      <button id="modal-close" style="background:none; border:0; color:#888; font-size:22px; cursor:pointer; padding:0 6px;">×</button>
+    </div>
+    <div id="settings-tabs" style="display:flex; gap:4px; padding:8px 12px 0; border-bottom:1px solid #23232c;">
+      <button class="tab-btn active" data-tab="t2i">Text → Image</button>
+      <button class="tab-btn" data-tab="anigen">AniGen</button>
+      <button class="tab-btn" data-tab="hunyuan3d">Hunyuan3D-2</button>
+    </div>
+    <div id="settings-body" style="padding:16px 20px; overflow-y:auto; flex:1;">
+      <div class="tab-pane" data-tab="t2i">
+        <div class="field">
+          <label>Extra prompt suffix <span class="hint">(appended after style preset, before generation)</span></label>
+          <textarea id="s-t2i-suffix" rows="2" placeholder="e.g. cinematic lighting, studio portrait"></textarea>
+        </div>
+        <div class="field">
+          <label>Negative prompt override <span class="hint">(replaces style default if non-empty)</span></label>
+          <textarea id="s-t2i-negative" rows="3" placeholder="leave blank to keep style default"></textarea>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Steps <span class="hint">(more = better, slower)</span></label><input id="s-t2i-steps" type="number" min="10" max="100" step="5" /></div>
+          <div class="field"><label>Guidance (CFG) <span class="hint">(5-9 typical)</span></label><input id="s-t2i-guidance" type="number" min="1" max="15" step="0.5" /></div>
+          <div class="field"><label>PAG scale <span class="hint">(0 disables)</span></label><input id="s-t2i-pag" type="number" min="0" max="5" step="0.1" /></div>
+        </div>
+      </div>
+      <div class="tab-pane" data-tab="anigen" style="display:none;">
+        <div class="field-row">
+          <div class="field"><label>CFG scale SS <span class="hint">(sparse structure)</span></label><input id="s-anigen-cfg-ss" type="number" min="1" max="15" step="0.5" /></div>
+          <div class="field"><label>CFG scale SLAT <span class="hint">(structured latent)</span></label><input id="s-anigen-cfg-slat" type="number" min="1" max="15" step="0.5" /></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Joint density <span class="hint">(0-4)</span></label><input id="s-anigen-joints" type="number" min="0" max="4" step="1" /></div>
+          <div class="field"><label>Skin smoothing iters</label><input id="s-anigen-smooth-iters" type="number" min="0" max="500" step="10" /></div>
+          <div class="field"><label>Skin smoothing α</label><input id="s-anigen-smooth-alpha" type="number" min="0" max="2" step="0.1" /></div>
+        </div>
+        <div class="field">
+          <label class="toggle"><input type="checkbox" id="s-anigen-smooth" /> Smooth skin weights</label>
+        </div>
+        <div class="field">
+          <label class="toggle"><input type="checkbox" id="s-anigen-filter" /> Geodesic filter skin weights</label>
+        </div>
+        <p class="hint" style="margin-top:12px;">AniGen always rigs. To get a static mesh, switch model to Hunyuan3D-2.</p>
+      </div>
+      <div class="tab-pane" data-tab="hunyuan3d" style="display:none;">
+        <div class="field">
+          <label class="toggle"><input type="checkbox" id="s-hy3d-texture" /> Generate texture <span class="hint">(slower, +60s)</span></label>
+        </div>
+        <div class="field">
+          <label class="toggle"><input type="checkbox" id="s-hy3d-bg" /> Remove background <span class="hint">(RMBG-1.4)</span></label>
+        </div>
+        <div class="field">
+          <label>Max polygons <span class="hint">(decimation cap)</span></label>
+          <input id="s-hy3d-polys" type="number" min="5000" max="1000000" step="10000" />
+        </div>
+      </div>
+    </div>
+    <div style="padding:12px 18px; border-top:1px solid #2a2a33; display:flex; gap:8px; justify-content:flex-end;">
+      <button id="modal-reset" class="btn">Reset defaults</button>
+      <button id="modal-cancel" class="btn">Cancel</button>
+      <button id="modal-save" class="btn primary">Save</button>
+    </div>
+  </div>
+</div>
+<div id="status"><span id="status-text">Ready. Enter a prompt and click Generate.</span></div>
+<div id="enriched-row" title="Prompt actually sent to HunyuanDiT (style suffix + 3D cues auto-appended)"><strong>HunyuanDiT sees</strong><span id="enriched-text">—</span></div>
+<div id="main">
+  <div id="viewer"></div>
+  <div id="sidebar">
+    <div>
+      <h3>Model</h3>
+      <div id="model-meta">Loading model info…</div>
+    </div>
+    <div id="pose-panel">
+      <h3>Pose (ControlNet)</h3>
+      <div id="pose-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;"></div>
+      <p class="hint" style="margin-top:4px; font-size:11px; color:#888;">Forces the generated 2D image into the selected pose. Click again to deselect.</p>
+    </div>
+    <div>
+      <h3>2D preview</h3>
+      <div id="preview-wrap" class="empty"><img id="preview" /></div>
+      <div id="upload-status" style="display:none; margin-top:6px; font-size:11px; color:#8ab4f8; display:none; align-items:center; justify-content:space-between; gap:6px;">
+        <span id="upload-filename">—</span>
+        <button id="clear-upload" style="background:none;border:0;color:#c15a5a;cursor:pointer;font-size:14px;">×</button>
+      </div>
+    </div>
+    <div id="mv-panel" style="display:none;">
+      <h3>Multi-view inputs</h3>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+        <div class="mv-slot" data-view="front">
+          <div class="mv-label">Front <span style="color:#c15a5a;">*</span></div>
+          <div class="mv-drop" data-view="front">+ image</div>
+          <input type="file" accept="image/*" data-view="front" style="display:none;" />
+        </div>
+        <div class="mv-slot" data-view="back">
+          <div class="mv-label">Back</div>
+          <div class="mv-drop" data-view="back">+ image</div>
+          <input type="file" accept="image/*" data-view="back" style="display:none;" />
+        </div>
+        <div class="mv-slot" data-view="left">
+          <div class="mv-label">Left</div>
+          <div class="mv-drop" data-view="left">+ image</div>
+          <input type="file" accept="image/*" data-view="left" style="display:none;" />
+        </div>
+        <div class="mv-slot" data-view="right">
+          <div class="mv-label">Right</div>
+          <div class="mv-drop" data-view="right">+ image</div>
+          <input type="file" accept="image/*" data-view="right" style="display:none;" />
+        </div>
+      </div>
+      <button id="gen-views-btn" disabled style="display:block; width:100%; margin-top:8px; padding:8px; background:#23232c; color:#888; border:1px solid #353540; border-radius:4px; cursor:pointer; font-size:12px;">🎲 Generate other views (Zero123++)</button>
+      <p class="hint" style="margin-top:6px; font-size:11px; color:#888;">Upload a front view, then click above to synthesize back / left / right.</p>
+    </div>
+    <div>
+      <h3>Animation</h3>
+      <select id="anim-select" disabled><option>— no clips —</option></select>
+    </div>
+    <div id="controls">
+      <h3>Display</h3>
+      <label class="toggle"><input type="checkbox" id="tg-skel" />Show skeleton</label>
+      <label class="toggle"><input type="checkbox" id="tg-class" />Show classification <span style="font-size:10px;color:#666;">(R=legs G=spine B=arms Y=other)</span></label>
+      <label class="toggle"><input type="checkbox" id="tg-wire" />Wireframe</label>
+      <label class="toggle"><input type="checkbox" id="tg-grid" checked />Grid</label>
+      <label class="toggle"><input type="checkbox" id="tg-autorot" />Auto-rotate</label>
+    </div>
+    <div id="cam-controls">
+      <h3>Camera</h3>
+      <div id="cam-btn-row" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px;">
+        <button class="cam-btn" data-view="front">Front</button>
+        <button class="cam-btn" data-view="34">3/4</button>
+        <button class="cam-btn" data-view="side">Side</button>
+        <button class="cam-btn" data-view="back">Back</button>
+        <button class="cam-btn" data-view="top">Top</button>
+        <button class="cam-btn" data-view="fit">Fit</button>
+      </div>
+    </div>
+    <div id="lighting">
+      <h3>Lighting</h3>
+      <label class="slider-row"><span>Env preset</span>
+        <select id="env-preset" class="ctl" style="width: 140px;">
+          <option value="studio">Studio</option>
+          <option value="neutral">Neutral</option>
+          <option value="sunset">Sunset</option>
+          <option value="neon">Neon</option>
+          <option value="night">Night</option>
+        </select>
+      </label>
+      <label class="slider-row"><span>Exposure</span><input type="range" id="lg-exposure" min="0.2" max="3" step="0.05" value="1.4" /></label>
+      <label class="slider-row"><span>Ambient</span><input type="range" id="lg-ambient" min="0" max="4" step="0.05" value="1.0" /></label>
+      <label class="slider-row"><span>Key</span><input type="range" id="lg-key" min="0" max="12" step="0.1" value="4.0" /></label>
+      <label class="slider-row"><span>Fill</span><input type="range" id="lg-fill" min="0" max="6" step="0.1" value="1.8" /></label>
+      <label class="slider-row"><span>Rim</span><input type="range" id="lg-rim" min="0" max="6" step="0.1" value="1.2" /></label>
+      <label class="slider-row"><span>Background</span><input type="color" id="lg-bg" value="#1a1a21" /></label>
+    </div>
+    <div>
+      <h3>Rig editor</h3>
+      <div id="edit-info" style="font-size:11px; color:#888; margin-bottom:6px;">
+        Enable <b>Show classification</b>, click a colored sphere to edit that bone. <b>T</b> = translate, <b>R</b> = rotate, <b>Esc</b> = deselect.
+      </div>
+      <button class="btn" onclick="window.exportEditedGLB && window.exportEditedGLB()" style="width:100%;">Download edited GLB</button>
+    </div>
+    <div>
+      <h3>Export</h3>
+      <a id="download" class="btn primary disabled" download="mesh.glb">Download original GLB</a>
+    </div>
+    <div id="jobinfo"></div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="/static/viewer.js"></script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+__pycache__/
+*.pyc
+*.pyo
+*.swp
+*.bak
+
+# Generated pose skeleton PNGs — produced by `python pose_gallery.py static/poses`
+static/poses/
+
+# Local debugging artifacts
+dbg_*.png
+last_input.png
+rmbg_test.png
+*.glb
+
+# Python venv / installer leftovers
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
